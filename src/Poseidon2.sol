@@ -191,6 +191,60 @@ library Poseidon2 {
         return 0;
     }
 
+    function poseidon2HashQM31(uint32[4] memory a, uint32[4] memory b)
+        public pure returns (uint32[4] memory result)
+    {
+        uint32[16] memory state;
+        state[0] = M31Field.partialReduce(a[0]);
+        state[1] = M31Field.partialReduce(b[0]);
+        state[2] = M31Field.partialReduce(a[1]);
+        state[3] = M31Field.partialReduce(a[2]);
+        state[4] = M31Field.partialReduce(a[3]);
+        state[5] = M31Field.partialReduce(b[1]);
+        state[6] = M31Field.partialReduce(b[2]);
+        state[7] = M31Field.partialReduce(b[3]);
+        // state[8..15] = 0
+
+        applyExternalRoundMatrix(state);
+
+        unchecked {
+            for (uint256 round = 0; round < N_HALF_FULL_ROUNDS; ++round) {
+                for (uint256 i = 0; i < N_STATE; ++i) {
+                    state[i] = M31Field.add(state[i], getExternalRoundConst(round, i));
+                }
+                for (uint256 i = 0; i < N_STATE; ++i) {
+                    state[i] = M31Field.pow5(state[i]);
+                }
+                applyExternalRoundMatrix(state);
+            }
+        }
+
+        unchecked {
+            for (uint256 round = 0; round < N_PARTIAL_ROUNDS; ++round) {
+                state[0] = M31Field.add(state[0], getInternalRoundConst(round));
+                state[0] = M31Field.pow5(state[0]);
+                applyInternalRoundMatrix(state);
+            }
+        }
+
+        unchecked {
+            for (uint256 round = 0; round < N_HALF_FULL_ROUNDS; ++round) {
+                for (uint256 i = 0; i < N_STATE; ++i) {
+                    state[i] = M31Field.add(state[i], getExternalRoundConst(round + N_HALF_FULL_ROUNDS, i));
+                }
+                for (uint256 i = 0; i < N_STATE; ++i) {
+                    state[i] = M31Field.pow5(state[i]);
+                }
+                applyExternalRoundMatrix(state);
+            }
+        }
+
+        result[0] = state[0];
+        result[1] = state[1];
+        result[2] = state[2];
+        result[3] = state[3];
+    }
+
     function hashTwo(uint256 left, uint256 right) internal pure returns (uint32) {
         uint32 l = uint32(left % M31Field.MODULUS);
         uint32 r = uint32(right % M31Field.MODULUS);
